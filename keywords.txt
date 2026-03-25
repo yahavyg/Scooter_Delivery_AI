@@ -1,0 +1,43 @@
+from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove
+
+
+def main_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        [
+            ["עדכון יומי", "קיבלתי הכנסה"],
+            ["קיבלתי טיפ", "מילאתי דלק"],
+            ["עשיתי טיפול", "היה תיקון"],
+            ["קיבלתי דוח", "קניתי אוכל/שתייה"],
+            ["דוח היום", "דוח שבועי"],
+            ["דוח חודשי"],
+        ],
+        resize_keyboard=True
+    )
+
+
+def cancel_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        [["ביטול"]],
+        resize_keyboard=True,
+        one_time_keyboard=True
+    )
+
+
+def yes_no_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        [["כן", "לא"]],
+        resize_keyboard=True,
+        one_time_keyboard=True
+    )
+
+
+def back_cancel_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        [["חזרה", "ביטול"]],
+        resize_keyboard=True,
+        one_time_keyboard=True
+    )
+
+
+def remove_keyboard():
+    return ReplyKeyboardRemove()

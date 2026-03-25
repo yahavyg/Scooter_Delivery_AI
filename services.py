@@ -28,10 +28,40 @@ def annual_depreciation_by_time(purchase_price: float, model_year: int, current_
     return max(total_depreciation, 0)
 
 
-def calculate_daily_costs(profile, daily_log):
+def normalize_event_totals(event_totals: dict | None):
+    event_totals = event_totals or {}
+
+    return {
+        "income": float(event_totals.get("income", 0) or 0),
+        "tip": float(event_totals.get("tip", 0) or 0),
+        "fuel": float(event_totals.get("fuel", 0) or 0),      # נשמר למעקב בלבד כרגע
+        "service": float(event_totals.get("service", 0) or 0),
+        "repair": float(event_totals.get("repair", 0) or 0),
+        "fine": float(event_totals.get("fine", 0) or 0),
+        "food": float(event_totals.get("food", 0) or 0),
+    }
+
+
+def calculate_daily_costs(profile, daily_log, event_totals=None):
+    """
+    event_totals:
+    {
+        income, tip, fuel, service, repair, fine, food
+    }
+
+    חשוב:
+    fuel event כרגע לא נכנס כהוצאה יומית מלאה.
+    הוצאה יומית של דלק מחושבת לפי ק"מ שנסעת בפועל.
+    """
+
+    event_totals = normalize_event_totals(event_totals)
+
     log_date = datetime.fromisoformat(daily_log["log_date"]).date()
     year_days = days_in_year(log_date.year)
 
+    # =========================
+    # Fixed annual costs
+    # =========================
     annual_fixed_without_dep = (
         profile["historical_garage_yearly"]
         + profile["annual_test"]
@@ -48,8 +78,11 @@ def calculate_daily_costs(profile, daily_log):
 
     fixed_daily = (annual_fixed_without_dep + depreciation_time_annual) / year_days
 
-    km_done = daily_log["km_done"]
+    km_done = float(daily_log["km_done"] or 0)
 
+    # =========================
+    # Fuel cost - תמיד לפי ק"מ בפועל
+    # =========================
     fuel_cost = 0
     if profile["fuel_km_per_liter"] > 0:
         fuel_cost = (km_done / profile["fuel_km_per_liter"]) * profile["fuel_price_per_liter"]
@@ -57,17 +90,61 @@ def calculate_daily_costs(profile, daily_log):
     oil_cost = km_done * profile["oil_cost_per_km"]
     depreciation_km_cost = km_done * profile["depreciation_km_cost_per_km"]
 
-    variable_daily = fuel_cost + oil_cost + depreciation_km_cost
+    # =========================
+    # Event expenses
+    # =========================
+    service_cost = event_totals["service"]
+    repair_cost = event_totals["repair"]
+    fine_cost = event_totals["fine"]
+    food_cost = event_totals["food"]
+
+    # =========================
+    # Income
+    # =========================
+    base_income = float(daily_log["income"] or 0)
+    extra_income = event_totals["income"]
+    tips_income = event_totals["tip"]
+
+    total_income = base_income + extra_income + tips_income
+
+    variable_daily = (
+        fuel_cost
+        + oil_cost
+        + depreciation_km_cost
+        + service_cost
+        + repair_cost
+        + fine_cost
+        + food_cost
+    )
+
     total_daily = fixed_daily + variable_daily
-    profit = daily_log["income"] - total_daily
+    profit = total_income - total_daily
 
     return {
+        # income
+        "base_income": base_income,
+        "extra_income": extra_income,
+        "tips_income": tips_income,
+        "total_income": total_income,
+
+        # fixed
         "fixed_daily": fixed_daily,
         "depreciation_time_daily": depreciation_time_annual / year_days,
+
+        # variable
         "fuel_cost": fuel_cost,
         "oil_cost": oil_cost,
         "depreciation_km_cost": depreciation_km_cost,
+        "service_cost": service_cost,
+        "repair_cost": repair_cost,
+        "fine_cost": fine_cost,
+        "food_cost": food_cost,
         "variable_daily": variable_daily,
+
+        # tracking only
+        "fuel_topups_amount": event_totals["fuel"],
+
+        # totals
         "total_daily": total_daily,
         "profit": profit,
     }
@@ -78,7 +155,9 @@ def check_maintenance_alerts(profile):
 
     current_km = profile["current_km"]
 
-    # שמן
+    # =========================
+    # Oil check
+    # =========================
     oil_km_since_check = current_km - profile["last_oil_check_km"]
     oil_interval = profile["oil_check_interval_km"]
 
@@ -94,7 +173,9 @@ def check_maintenance_alerts(profile):
                 f"🛢 בדיקת שמן מתקרבת. נשארו בערך {oil_remaining:.0f} ק\"מ."
             )
 
-    # טיפול
+    # =========================
+    # Service
+    # =========================
     service_km_since = current_km - profile["last_service_km"]
     service_interval = profile["service_interval_km"]
 
@@ -113,8 +194,8 @@ def check_maintenance_alerts(profile):
     return alerts
 
 
-def build_daily_summary(profile, daily_log):
-    result = calculate_daily_costs(profile, daily_log)
+def build_daily_summary(profile, daily_log, event_totals=None):
+    result = calculate_daily_costs(profile, daily_log, event_totals)
     alerts = check_maintenance_alerts(profile)
 
     profit_emoji = "🟢" if result["profit"] >= 0 else "🔴"
@@ -122,14 +203,28 @@ def build_daily_summary(profile, daily_log):
     summary = (
         f"📅 סיכום ליום {daily_log['log_date']}\n\n"
         f"⏱ שעות עבודה: {daily_log['hours_worked']}\n"
-        f"🛵 ק\"מ: {daily_log['km_done']}\n"
-        f"💰 הכנסה: ₪{daily_log['income']:.2f}\n\n"
+        f"🛵 ק\"מ: {daily_log['km_done']}\n\n"
+
+        f"💰 הכנסות:\n"
+        f"   ├ הכנסה יומית: ₪{result['base_income']:.2f}\n"
+        f"   ├ הכנסות נוספות: ₪{result['extra_income']:.2f}\n"
+        f"   ├ טיפים: ₪{result['tips_income']:.2f}\n"
+        f"   └ סה\"כ נכנס: ₪{result['total_income']:.2f}\n\n"
+
         f"📌 הוצאות קבועות יומיות: ₪{result['fixed_daily']:.2f}\n"
         f"   └ ירידת ערך לפי זמן: ₪{result['depreciation_time_daily']:.2f}\n\n"
+
         f"📌 הוצאות משתנות: ₪{result['variable_daily']:.2f}\n"
-        f"   ├ דלק: ₪{result['fuel_cost']:.2f}\n"
+        f"   ├ דלק (לפי ק\"מ): ₪{result['fuel_cost']:.2f}\n"
         f"   ├ שמן: ₪{result['oil_cost']:.2f}\n"
-        f"   └ ירידת ערך לפי ק\"מ: ₪{result['depreciation_km_cost']:.2f}\n\n"
+        f"   ├ ירידת ערך לפי ק\"מ: ₪{result['depreciation_km_cost']:.2f}\n"
+        f"   ├ טיפול: ₪{result['service_cost']:.2f}\n"
+        f"   ├ תיקון: ₪{result['repair_cost']:.2f}\n"
+        f"   ├ דוחות: ₪{result['fine_cost']:.2f}\n"
+        f"   └ אוכל/שתייה: ₪{result['food_cost']:.2f}\n\n"
+
+        f"⛽ תדלוקים שנרשמו היום (למעקב): ₪{result['fuel_topups_amount']:.2f}\n\n"
+
         f"🧾 סה\"כ הוצאות: ₪{result['total_daily']:.2f}\n"
         f"{profit_emoji} רווח / הפסד: ₪{result['profit']:.2f}"
     )
@@ -140,19 +235,40 @@ def build_daily_summary(profile, daily_log):
     return summary
 
 
-def build_period_report(profile, logs, title="דוח תקופתי"):
+def build_period_report(profile, logs, events_by_date=None, title="דוח תקופתי"):
+    events_by_date = events_by_date or {}
+
     total_income = 0
     total_expenses = 0
     worked_days = 0
     no_work_days = 0
     auto_closed_days = 0
 
+    total_tips = 0
+    total_fuel = 0
+    total_fuel_topups = 0
+    total_service = 0
+    total_repair = 0
+    total_fines = 0
+    total_food = 0
+
     for log in logs:
-        result = calculate_daily_costs(profile, log)
-        total_income += log["income"]
+        log_date = log["log_date"]
+        event_totals = events_by_date.get(log_date, {})
+        result = calculate_daily_costs(profile, log, event_totals)
+
+        total_income += result["total_income"]
         total_expenses += result["total_daily"]
 
-        if log["hours_worked"] > 0 or log["km_done"] > 0 or log["income"] > 0:
+        total_tips += result["tips_income"]
+        total_fuel += result["fuel_cost"]
+        total_fuel_topups += result["fuel_topups_amount"]
+        total_service += result["service_cost"]
+        total_repair += result["repair_cost"]
+        total_fines += result["fine_cost"]
+        total_food += result["food_cost"]
+
+        if result["total_income"] > 0 or log["hours_worked"] > 0 or log["km_done"] > 0:
             worked_days += 1
         else:
             no_work_days += 1
@@ -170,7 +286,16 @@ def build_period_report(profile, logs, title="דוח תקופתי"):
     report = (
         f"📊 {title}\n\n"
         f"💰 הכנסות: ₪{total_income:.2f}\n"
+        f"   └ מתוכן טיפים: ₪{total_tips:.2f}\n\n"
+
         f"🧾 הוצאות: ₪{total_expenses:.2f}\n"
+        f"   ├ דלק שנצרך בפועל: ₪{total_fuel:.2f}\n"
+        f"   ├ תדלוקים שנרשמו: ₪{total_fuel_topups:.2f}\n"
+        f"   ├ טיפול: ₪{total_service:.2f}\n"
+        f"   ├ תיקון: ₪{total_repair:.2f}\n"
+        f"   ├ דוחות: ₪{total_fines:.2f}\n"
+        f"   └ אוכל/שתייה: ₪{total_food:.2f}\n\n"
+
         f"{emoji} רווח / הפסד: ₪{total_profit:.2f}\n\n"
         f"📉 ממוצע הוצאות יומי: ₪{avg_expenses:.2f}\n"
         f"📈 ממוצע רווח יומי: ₪{avg_profit:.2f}\n\n"

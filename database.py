@@ -14,7 +14,9 @@ def init_db():
     conn = get_connection()
     cur = conn.cursor()
 
-    # טבלת משתמשים
+    # =========================
+    # users
+    # =========================
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,7 +30,9 @@ def init_db():
     )
     """)
 
-    # טבלת פרופיל קטנוע
+    # =========================
+    # scooter_profiles
+    # =========================
     cur.execute("""
     CREATE TABLE IF NOT EXISTS scooter_profiles (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -66,7 +70,9 @@ def init_db():
     )
     """)
 
-    # טבלת עדכונים יומיים
+    # =========================
+    # daily_logs
+    # =========================
     cur.execute("""
     CREATE TABLE IF NOT EXISTS daily_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -81,6 +87,42 @@ def init_db():
         UNIQUE(user_id, log_date),
         FOREIGN KEY (user_id) REFERENCES users(id)
     )
+    """)
+
+    # =========================
+    # daily_events
+    # =========================
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS daily_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        event_date TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        amount REAL NOT NULL DEFAULT 0,
+        liters REAL NOT NULL DEFAULT 0,
+        km_at_event REAL NOT NULL DEFAULT 0,
+        notes TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+    """)
+
+    # =========================
+    # indexes
+    # =========================
+    cur.execute("""
+    CREATE INDEX IF NOT EXISTS idx_daily_logs_user_date
+    ON daily_logs(user_id, log_date)
+    """)
+
+    cur.execute("""
+    CREATE INDEX IF NOT EXISTS idx_daily_events_user_date
+    ON daily_events(user_id, event_date)
+    """)
+
+    cur.execute("""
+    CREATE INDEX IF NOT EXISTS idx_daily_events_type
+    ON daily_events(event_type)
     """)
 
     conn.commit()

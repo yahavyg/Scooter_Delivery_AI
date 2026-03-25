@@ -298,6 +298,8 @@ def get_daily_logs_between(user_id, start_date, end_date):
     rows = cur.fetchall()
     conn.close()
     return rows
+
+
 def create_or_update_daily_log_with_km_sync(user_id, log_date, hours_worked, km_done, income, status):
     """
     שומר לוג יומי ומסנכרן current_km בצורה חכמה:
@@ -379,3 +381,140 @@ def create_or_update_daily_log_with_km_sync(user_id, log_date, hours_worked, km_
 
     conn.commit()
     conn.close()
+
+
+# =========================
+# Daily Events
+# =========================
+def create_daily_event(
+    user_id,
+    event_date,
+    event_type,
+    amount,
+    liters=0,
+    km_at_event=0,
+    notes=""
+):
+    """
+    event_type:
+    income, tip, fuel, service, repair, fine, food
+    """
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    current_time = now_str()
+
+    # נביא פרופיל אם קיים
+    cur.execute("""
+        SELECT * FROM scooter_profiles
+        WHERE user_id = ?
+    """, (user_id,))
+    profile = cur.fetchone()
+
+    # יצירת האירוע
+    cur.execute("""
+        INSERT INTO daily_events (
+            user_id,
+            event_date,
+            event_type,
+            amount,
+            liters,
+            km_at_event,
+            notes,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        user_id,
+        event_date,
+        event_type,
+        amount,
+        liters,
+        km_at_event,
+        notes or "",
+        current_time,
+    ))
+
+    # אם הוזן ק"מ והוא גבוה יותר - נעדכן current_km
+    if profile and km_at_event and km_at_event > profile["current_km"]:
+        cur.execute("""
+            UPDATE scooter_profiles
+            SET current_km = ?, updated_at = ?
+            WHERE user_id = ?
+        """, (km_at_event, current_time, user_id))
+
+    # אם זה טיפול - נעדכן גם טיפול אחרון
+    if event_type == "service" and km_at_event:
+        cur.execute("""
+            UPDATE scooter_profiles
+            SET last_service_km = ?, updated_at = ?
+            WHERE user_id = ?
+        """, (km_at_event, current_time, user_id))
+
+    conn.commit()
+    event_id = cur.lastrowid
+    conn.close()
+    return event_id
+
+
+def get_daily_events(user_id, event_date):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT * FROM daily_events
+        WHERE user_id = ? AND event_date = ?
+        ORDER BY created_at ASC
+    """, (user_id, event_date))
+
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+def get_daily_events_between(user_id, start_date, end_date):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT * FROM daily_events
+        WHERE user_id = ?
+          AND event_date >= ?
+          AND event_date <= ?
+        ORDER BY event_date ASC, created_at ASC
+    """, (user_id, start_date, end_date))
+
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+def sum_daily_events_by_type(user_id, event_date):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT event_type, SUM(amount) AS total_amount
+        FROM daily_events
+        WHERE user_id = ? AND event_date = ?
+        GROUP BY event_type
+    """, (user_id, event_date))
+
+    rows = cur.fetchall()
+    conn.close()
+
+    result = {
+        "income": 0.0,
+        "tip": 0.0,
+        "fuel": 0.0,
+        "service": 0.0,
+        "repair": 0.0,
+        "fine": 0.0,
+        "food": 0.0,
+    }
+
+    for row in rows:
+        result[row["event_type"]] = float(row["total_amount"] or 0)
+
+    return result

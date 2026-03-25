@@ -38,13 +38,16 @@ API_BASE = "http://127.0.0.1:8000"
     SETUP_OIL_CHECK_INTERVAL_KM,
     SETUP_LAST_SERVICE_KM,
     SETUP_SERVICE_INTERVAL_KM,
+
     DAILY_HOURS,
     DAILY_KM,
     DAILY_INCOME,
+
     EVENT_AMOUNT,
     EVENT_LITERS,
     EVENT_NOTES,
 ) = range(23)
+
 
 
 def get_today_str():
@@ -147,12 +150,13 @@ async def send_today_summary(update: Update, telegram_id: int):
         response = requests.get(
             f"{API_BASE}/daily-summary/{telegram_id}",
             params={"log_date": get_today_str()},
-            timeout=10
+            timeout=20
         )
 
         if response.status_code == 200:
             data = response.json()
-            await update.message.reply_text(data["summary"], reply_markup=main_keyboard())
+            await update.message.reply_text(data["summary"], reply_markup=MAIN_KB)
+
     except Exception:
         pass
 
@@ -167,7 +171,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user:
         await update.message.reply_text(
             "המערכת פעילה.\nבחר פעולה:",
-            reply_markup=main_keyboard()
+            reply_markup=MAIN_KB
         )
         return ConversationHandler.END
 
@@ -178,7 +182,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "אחרי דלק, תחזוקה, הוצאות והפסדים.\n\n"
         "נתחיל קצר.\n"
         "מה השם שלך?",
-        reply_markup=remove_keyboard()
+        reply_markup=ReplyKeyboardRemove()
     )
     return REG_NAME
 
@@ -520,7 +524,7 @@ async def setup_service_interval_km(update: Update, context: ContextTypes.DEFAUL
         "- הוצאות קבועות\n"
         "- התראות שמן וטיפול\n\n"
         "בחר פעולה:",
-        reply_markup=main_keyboard()
+        reply_markup=MAIN_KB
     )
     return ConversationHandler.END
 
@@ -536,18 +540,18 @@ async def today_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         response = requests.get(
             f"{API_BASE}/daily-summary/{telegram_id}",
             params={"log_date": log_date},
-            timeout=10
+            timeout=20
         )
 
         if response.status_code != 200:
-            await update.message.reply_text("לא נמצא דוח להיום.", reply_markup=main_keyboard())
+            await update.message.reply_text("לא נמצא דוח להיום.", reply_markup=MAIN_KB)
             return
 
         data = response.json()
-        await update.message.reply_text(data["summary"], reply_markup=main_keyboard())
+        await update.message.reply_text(data["summary"], reply_markup=MAIN_KB)
 
     except Exception as e:
-        await update.message.reply_text(f"שגיאה בשליפת דוח היום:\n{e}", reply_markup=main_keyboard())
+        await update.message.reply_text(f"שגיאה בשליפת דוח היום:\n{e}", reply_markup=MAIN_KB)
 
 
 async def week_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -556,18 +560,18 @@ async def week_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         response = requests.get(
             f"{API_BASE}/weekly-report/{telegram_id}",
-            timeout=10
+            timeout=20
         )
 
         if response.status_code != 200:
-            await update.message.reply_text("לא נמצא דוח שבועי.", reply_markup=main_keyboard())
+            await update.message.reply_text("לא נמצא דוח שבועי.", reply_markup=MAIN_KB)
             return
 
         data = response.json()
-        await update.message.reply_text(data["report"], reply_markup=main_keyboard())
+        await update.message.reply_text(data["report"], reply_markup=MAIN_KB)
 
     except Exception as e:
-        await update.message.reply_text(f"שגיאה בשליפת דוח שבועי:\n{e}", reply_markup=main_keyboard())
+        await update.message.reply_text(f"שגיאה בשליפת דוח שבועי:\n{e}", reply_markup=MAIN_KB)
 
 
 async def month_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -576,18 +580,18 @@ async def month_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         response = requests.get(
             f"{API_BASE}/monthly-report/{telegram_id}",
-            timeout=10
+            timeout=20
         )
 
         if response.status_code != 200:
-            await update.message.reply_text("לא נמצא דוח חודשי.", reply_markup=main_keyboard())
+            await update.message.reply_text("לא נמצא דוח חודשי.", reply_markup=MAIN_KB)
             return
 
         data = response.json()
-        await update.message.reply_text(data["report"], reply_markup=main_keyboard())
+        await update.message.reply_text(data["report"], reply_markup=MAIN_KB)
 
     except Exception as e:
-        await update.message.reply_text(f"שגיאה בשליפת דוח חודשי:\n{e}", reply_markup=main_keyboard())
+        await update.message.reply_text(f"שגיאה בשליפת דוח חודשי:\n{e}", reply_markup=MAIN_KB)
 
 
 # =========================
@@ -649,14 +653,11 @@ async def update_day_income(update: Update, context: ContextTypes.DEFAULT_TYPE):
         response = requests.post(
             f"{API_BASE}/daily-update",
             json=payload,
-            timeout=20
+            timeout=40
         )
 
         if response.status_code != 200:
-            await update.message.reply_text(
-                f"שגיאה בשמירת היום:\n{response.text}",
-                reply_markup=main_keyboard()
-            )
+            await update.message.reply_text(f"שגיאה בשמירת היום:\n{response.text}")
             return ConversationHandler.END
 
         data = response.json()
@@ -722,10 +723,10 @@ async def update_day_income(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if data.get("maintenance_alerts"):
             msg += "\n\nתחזוקה:\n" + "\n".join(data["maintenance_alerts"])
 
-        await update.message.reply_text(msg, reply_markup=main_keyboard())
+        await update.message.reply_text(msg, reply_markup=MAIN_KB)
 
     except Exception as e:
-        await update.message.reply_text(f"שגיאה בחיבור ל־API:\n{e}", reply_markup=main_keyboard())
+        await update.message.reply_text(f"שגיאה בחיבור ל־API:\n{e}", reply_markup=MAIN_KB)
 
     return ConversationHandler.END
 
@@ -794,7 +795,7 @@ async def start_event_flow(update: Update, context: ContextTypes.DEFAULT_TYPE, e
 async def event_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     event_type = context.user_data.get("event_type")
     if not event_type:
-        await update.message.reply_text("שגיאה בזרימת האירוע.", reply_markup=main_keyboard())
+        await update.message.reply_text("שגיאה בזרימת האירוע.", reply_markup=MAIN_KB)
         return ConversationHandler.END
 
     val = safe_float(update.message.text)
@@ -843,18 +844,16 @@ async def event_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
 
     try:
-        await update.message.reply_text("שומר את האירוע...")
-
         response = requests.post(
             f"{API_BASE}/event",
             json=payload,
-            timeout=10
+            timeout=20
         )
 
         if response.status_code != 200:
             await update.message.reply_text(
                 f"שגיאה בשמירת האירוע:\n{response.text}",
-                reply_markup=main_keyboard()
+                reply_markup=MAIN_KB
             )
             return ConversationHandler.END
 
@@ -874,13 +873,13 @@ async def event_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if data.get("maintenance_alerts"):
             msg += "\n\nתחזוקה:\n" + "\n".join(data["maintenance_alerts"])
 
-        await update.message.reply_text(msg, reply_markup=main_keyboard())
+        await update.message.reply_text(msg, reply_markup=MAIN_KB)
 
         if data.get("summary"):
-            await update.message.reply_text(data["summary"], reply_markup=main_keyboard())
+            await update.message.reply_text(data["summary"], reply_markup=MAIN_KB)
 
     except Exception as e:
-        await update.message.reply_text(f"שגיאה בחיבור ל־API:\n{e}", reply_markup=main_keyboard())
+        await update.message.reply_text(f"שגיאה בחיבור ל־API:\n{e}", reply_markup=MAIN_KB)
 
     return ConversationHandler.END
 
@@ -920,15 +919,39 @@ async def action_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # CANCEL
 # =========================
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("בוטל.", reply_markup=main_keyboard())
+    await update.message.reply_text("בוטל.", reply_markup=MAIN_KB)
     return ConversationHandler.END
 
 
 # =========================
-# TEXT ROUTER - REPORTS ONLY
+# TEXT ROUTER
 # =========================
 async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (update.message.text or "").strip()
+
+    if text == "עדכון יומי":
+        return await update_day_start(update, context)
+
+    if text == "קיבלתי הכנסה":
+        return await action_income(update, context)
+
+    if text == "קיבלתי טיפ":
+        return await action_tip(update, context)
+
+    if text == "מילאתי דלק":
+        return await action_fuel(update, context)
+
+    if text == "עשיתי טיפול":
+        return await action_service(update, context)
+
+    if text == "היה תיקון":
+        return await action_repair(update, context)
+
+    if text == "קיבלתי דוח":
+        return await action_fine(update, context)
+
+    if text == "קניתי אוכל/שתייה":
+        return await action_food(update, context)
 
     if text == "דוח היום":
         return await today_report(update, context)
@@ -952,15 +975,6 @@ def main():
         entry_points=[
             CommandHandler("start", start),
             CommandHandler("update", update_day_start),
-
-            MessageHandler(filters.Regex("^עדכון יומי$"), update_day_start),
-            MessageHandler(filters.Regex("^קיבלתי הכנסה$"), action_income),
-            MessageHandler(filters.Regex("^קיבלתי טיפ$"), action_tip),
-            MessageHandler(filters.Regex("^מילאתי דלק$"), action_fuel),
-            MessageHandler(filters.Regex("^עשיתי טיפול$"), action_service),
-            MessageHandler(filters.Regex("^היה תיקון$"), action_repair),
-            MessageHandler(filters.Regex("^קיבלתי דוח$"), action_fine),
-            MessageHandler(filters.Regex("^קניתי אוכל/שתייה$"), action_food),
         ],
         states={
             REG_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, reg_name)],
@@ -980,9 +994,11 @@ def main():
             SETUP_OIL_CHECK_INTERVAL_KM: [MessageHandler(filters.TEXT & ~filters.COMMAND, setup_oil_check_interval_km)],
             SETUP_LAST_SERVICE_KM: [MessageHandler(filters.TEXT & ~filters.COMMAND, setup_last_service_km)],
             SETUP_SERVICE_INTERVAL_KM: [MessageHandler(filters.TEXT & ~filters.COMMAND, setup_service_interval_km)],
+
             DAILY_HOURS: [MessageHandler(filters.TEXT & ~filters.COMMAND, update_day_hours)],
             DAILY_KM: [MessageHandler(filters.TEXT & ~filters.COMMAND, update_day_km)],
             DAILY_INCOME: [MessageHandler(filters.TEXT & ~filters.COMMAND, update_day_income)],
+
             EVENT_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, event_amount)],
             EVENT_LITERS: [MessageHandler(filters.TEXT & ~filters.COMMAND, event_liters)],
             EVENT_NOTES: [MessageHandler(filters.TEXT & ~filters.COMMAND, event_notes)],
