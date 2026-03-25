@@ -21,8 +21,8 @@ from models import (
 )
 
 API_BASE = "http://127.0.0.1:8000"
-OWNER_ID = 8434558133
-ACCESS_FILE = "access_control.json"
+
+ALLOWED_USER_ID = 851468939
 
 (
     REG_NAME,
@@ -49,62 +49,6 @@ ACCESS_FILE = "access_control.json"
     EVENT_LITERS,
     EVENT_NOTES,
 ) = range(23)
-
-
-def load_access():
-    if not os.path.exists(ACCESS_FILE):
-        data = {
-            "public_mode": False,
-            "allowed_users": [OWNER_ID],
-        }
-        save_access(data)
-        return data
-
-    with open(ACCESS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def save_access(data):
-    with open(ACCESS_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
-def is_owner(update: Update):
-    return update.effective_user.id == OWNER_ID
-
-
-def is_allowed(update: Update):
-    data = load_access()
-    user_id = update.effective_user.id
-
-    if data.get("public_mode", False):
-        return True
-
-    return user_id in data.get("allowed_users", [])
-
-
-def add_allowed_user(user_id: int):
-    data = load_access()
-    users = data.get("allowed_users", [])
-    if user_id not in users:
-        users.append(user_id)
-    data["allowed_users"] = users
-    save_access(data)
-
-
-def remove_allowed_user(user_id: int):
-    data = load_access()
-    users = data.get("allowed_users", [])
-    if user_id in users and user_id != OWNER_ID:
-        users.remove(user_id)
-    data["allowed_users"] = users
-    save_access(data)
-
-
-def set_public_mode(enabled: bool):
-    data = load_access()
-    data["public_mode"] = enabled
-    save_access(data)
 
 
 def get_today_str():
@@ -203,8 +147,6 @@ def validate_interval(value: float, field_name: str, min_value: float, max_value
 
 
 async def send_today_summary(update: Update, telegram_id: int):
-    if not is_allowed(update):
-        return
     try:
         response = requests.get(
             f"{API_BASE}/daily-summary/{telegram_id}",
@@ -250,10 +192,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def reg_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     name = (update.message.text or "").strip()
     if not name:
         await update.message.reply_text("תכתוב שם תקין.")
@@ -280,10 +218,6 @@ async def reg_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def setup_scooter_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     value = (update.message.text or "").strip()
     if not value:
         await update.message.reply_text("תכתוב סוג קטנוע תקין.")
@@ -295,10 +229,6 @@ async def setup_scooter_type(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def setup_engine_cc(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     val = safe_int(update.message.text)
     if val is None:
         await update.message.reply_text("תכניס מספר תקין לנפח מנוע.")
@@ -315,10 +245,6 @@ async def setup_engine_cc(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def setup_year(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     val = safe_int(update.message.text)
     if val is None:
         await update.message.reply_text("תכניס שנתון תקין.")
@@ -335,10 +261,6 @@ async def setup_year(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def setup_purchase_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     val = safe_float(update.message.text)
     if val is None:
         await update.message.reply_text("תכניס סכום תקין למחיר הקנייה.")
@@ -358,10 +280,6 @@ async def setup_purchase_price(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 async def setup_garage_yearly(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     val = safe_float(update.message.text)
     if val is None:
         await update.message.reply_text("תכניס סכום תקין לעלות טיפולים ותיקונים שנתית.")
@@ -378,10 +296,6 @@ async def setup_garage_yearly(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def setup_test_yearly(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     val = safe_float(update.message.text)
     if val is None:
         await update.message.reply_text("תכניס סכום תקין לעלות טסט שנתית.")
@@ -398,10 +312,6 @@ async def setup_test_yearly(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def setup_insurance_yearly(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     val = safe_float(update.message.text)
     if val is None:
         await update.message.reply_text("תכניס סכום תקין לעלות ביטוח שנתית.")
@@ -418,10 +328,6 @@ async def setup_insurance_yearly(update: Update, context: ContextTypes.DEFAULT_T
 
 
 async def setup_loans_yearly(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     val = safe_float(update.message.text)
     if val is None:
         await update.message.reply_text("תכניס סכום תקין להלוואות שנתיות.")
@@ -438,10 +344,6 @@ async def setup_loans_yearly(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def setup_fines_yearly(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     val = safe_float(update.message.text)
     if val is None:
         await update.message.reply_text("תכניס סכום תקין לקנסות שנתיים.")
@@ -462,10 +364,6 @@ async def setup_fines_yearly(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def setup_fuel_km_per_liter(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     val = safe_float(update.message.text)
     if val is None:
         await update.message.reply_text('תכניס מספר תקין לק"מ לליטר.')
@@ -485,10 +383,6 @@ async def setup_fuel_km_per_liter(update: Update, context: ContextTypes.DEFAULT_
 
 
 async def setup_fuel_price_per_liter(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     val = safe_float(update.message.text)
     if val is None:
         await update.message.reply_text("תכניס מחיר תקין לליטר דלק.")
@@ -505,10 +399,6 @@ async def setup_fuel_price_per_liter(update: Update, context: ContextTypes.DEFAU
 
 
 async def setup_current_km(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     val = safe_float(update.message.text)
     if val is None:
         await update.message.reply_text('תכניס ק"מ נוכחי תקין.')
@@ -529,10 +419,6 @@ async def setup_current_km(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def setup_last_oil_check_km(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     val = safe_float(update.message.text)
     if val is None:
         await update.message.reply_text('תכניס ק"מ תקין לבדיקה אחרונה של שמן.')
@@ -552,10 +438,6 @@ async def setup_last_oil_check_km(update: Update, context: ContextTypes.DEFAULT_
 
 
 async def setup_oil_check_interval_km(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     val = safe_float(update.message.text)
     if val is None:
         await update.message.reply_text("תכניס מספר תקין למרווח בדיקת שמן.")
@@ -572,10 +454,6 @@ async def setup_oil_check_interval_km(update: Update, context: ContextTypes.DEFA
 
 
 async def setup_last_service_km(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     val = safe_float(update.message.text)
     if val is None:
         await update.message.reply_text('תכניס ק"מ תקין לטיפול אחרון.')
@@ -595,10 +473,6 @@ async def setup_last_service_km(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 async def setup_service_interval_km(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     val = safe_float(update.message.text)
     if val is None:
         await update.message.reply_text("תכניס מספר תקין למרווח טיפול.")
@@ -663,10 +537,6 @@ async def setup_service_interval_km(update: Update, context: ContextTypes.DEFAUL
 # REPORTS
 # =========================
 async def today_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return
-
     telegram_id = update.effective_user.id
     log_date = get_today_str()
 
@@ -689,10 +559,6 @@ async def today_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def week_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return
-
     telegram_id = update.effective_user.id
 
     try:
@@ -713,10 +579,6 @@ async def week_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def month_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return
-
     telegram_id = update.effective_user.id
 
     try:
@@ -740,10 +602,6 @@ async def month_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # DAILY UPDATE FLOW
 # =========================
 async def update_day_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     telegram_id = update.effective_user.id
     user = get_user_by_telegram_id(telegram_id)
 
@@ -757,10 +615,6 @@ async def update_day_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def update_day_hours(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     val = safe_float(update.message.text)
     if val is None or val < 0 or val > 24:
         await update.message.reply_text("שעות עבודה חייבות להיות בין 0 ל־24.")
@@ -772,10 +626,6 @@ async def update_day_hours(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def update_day_km(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     val = safe_float(update.message.text)
     if val is None or val < 0 or val > 1000:
         await update.message.reply_text('ק"מ יומי חייב להיות בין 0 ל־1000.')
@@ -787,10 +637,6 @@ async def update_day_km(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def update_day_income(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     val = safe_float(update.message.text)
     if val is None or val < 0 or val > 100000:
         await update.message.reply_text("הכנסה יומית חייבת להיות בין 0 ל־100000.")
@@ -935,10 +781,6 @@ EVENT_CONFIG = {
 
 
 async def start_event_flow(update: Update, context: ContextTypes.DEFAULT_TYPE, event_type: str):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     telegram_id = update.effective_user.id
     user = get_user_by_telegram_id(telegram_id)
 
@@ -958,10 +800,6 @@ async def start_event_flow(update: Update, context: ContextTypes.DEFAULT_TYPE, e
 
 
 async def event_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     event_type = context.user_data.get("event_type")
     if not event_type:
         await update.message.reply_text("שגיאה בזרימת האירוע.", reply_markup=main_keyboard())
@@ -983,10 +821,6 @@ async def event_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def event_liters(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     val = safe_float(update.message.text)
     if val is None or val < 0 or val > 100:
         await update.message.reply_text("תכניס כמות ליטרים תקינה.")
@@ -998,10 +832,6 @@ async def event_liters(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def event_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     text = (update.message.text or "").strip()
     if text.lower() == "לא":
         text = ""
@@ -1067,51 +897,30 @@ async def event_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # BUTTON ACTIONS
 # =========================
 async def action_income(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return
     return await start_event_flow(update, context, "income")
 
 
 async def action_tip(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return
     return await start_event_flow(update, context, "tip")
 
 
 async def action_fuel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return
     return await start_event_flow(update, context, "fuel")
 
 
 async def action_service(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return
     return await start_event_flow(update, context, "service")
 
 
 async def action_repair(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return
     return await start_event_flow(update, context, "repair")
 
 
 async def action_fine(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return
     return await start_event_flow(update, context, "fine")
 
 
 async def action_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return
     return await start_event_flow(update, context, "food")
 
 
@@ -1119,10 +928,6 @@ async def action_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # CANCEL
 # =========================
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        await update.message.reply_text("הגישה נדחתה.")
-        return ConversationHandler.END
-
     await update.message.reply_text("בוטל.", reply_markup=main_keyboard())
     return ConversationHandler.END
 
@@ -1131,9 +936,6 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # TEXT ROUTER - REPORTS ONLY
 # =========================
 async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update):
-        return
-
     text = (update.message.text or "").strip()
 
     if text == "דוח היום":
@@ -1147,14 +949,72 @@ async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     return None
 
+import json
+import os
 
-# =========================
-# ACCESS COMMANDS
-# =========================
+OWNER_ID = 851468939
+ACCESS_FILE = "access_control.json"
+
+
+def load_access():
+    if not os.path.exists(ACCESS_FILE):
+        data = {
+            "public_mode": False,
+            "allowed_users": [OWNER_ID],
+        }
+        save_access(data)
+        return data
+
+    with open(ACCESS_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_access(data):
+    with open(ACCESS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def is_owner(update: Update):
+    return update.effective_user.id == OWNER_ID
+
+
+def is_allowed(update: Update):
+    data = load_access()
+    user_id = update.effective_user.id
+
+    if data.get("public_mode", False):
+        return True
+
+    return user_id in data.get("allowed_users", [])
+
+
+def add_allowed_user(user_id: int):
+    data = load_access()
+    users = data.get("allowed_users", [])
+    if user_id not in users:
+        users.append(user_id)
+    data["allowed_users"] = users
+    save_access(data)
+
+
+def remove_allowed_user(user_id: int):
+    data = load_access()
+    users = data.get("allowed_users", [])
+    if user_id in users and user_id != OWNER_ID:
+        users.remove(user_id)
+    data["allowed_users"] = users
+    save_access(data)
+
+
+def set_public_mode(enabled: bool):
+    data = load_access()
+    data["public_mode"] = enabled
+    save_access(data)
+
+
 async def public_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_owner(update):
         return
-
     set_public_mode(True)
     await update.message.reply_text("הבוט פתוח לכולם.")
 
@@ -1162,7 +1022,6 @@ async def public_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def public_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_owner(update):
         return
-
     set_public_mode(False)
     await update.message.reply_text("הבוט סגור. רק משתמשים מורשים יכולים להיכנס.")
 
@@ -1216,7 +1075,6 @@ async def allowed_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Allowed users:\n" + "\n".join(str(u) for u in users)
     )
     await update.message.reply_text(msg)
-
 
 # =========================
 # MAIN
